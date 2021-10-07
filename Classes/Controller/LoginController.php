@@ -20,6 +20,7 @@ use TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer;
 
 class LoginController
 {
+
     /**
      * Global oidc settings
      *
@@ -35,7 +36,8 @@ class LoginController
     protected $pluginConfiguration;
 
     /**
-     * @var ContentObjectRenderer will automatically be injected, if this controller is called as a plugin
+     * @var ContentObjectRenderer will automatically be injected, if this controller is
+     *      called as a plugin
      */
     public $cObj;
 
@@ -54,16 +56,18 @@ class LoginController
     /**
      * Main entry point for the OIDC plugin.
      *
-     * If the user is not logged in, redirect to the authorization server to start the oidc process
+     * If the user is not logged in, redirect to the authorization server to start the
+     * oidc process
      *
-     * If the user has just been logged in and just came back from the authorization server, redirect the user to the
-     * final redirect URL.
+     * If the user has just been logged in and just came back from the authorization
+     * server, redirect the user to the final redirect URL.
      *
-     * @param string $_ ignored
+     * @param string     $_ ignored
      * @param array|null $pluginConfiguration
      */
     public function login($_ = '', $pluginConfiguration)
     {
+
         if (is_array($pluginConfiguration)) {
             $this->pluginConfiguration = $pluginConfiguration;
         }
@@ -90,32 +94,48 @@ class LoginController
             $options = $this->addCodeChallengeToOptions($codeChallenge, $authorizationUrlOptions);
             $_SESSION['oidc_code_verifier'] = $codeVerifier;
         }
-        $authorizationUrl = $service->getAuthorizationUrl($options?: []);
-
+        $authorizationUrl = $service->getAuthorizationUrl($options ?: []);
         $state = $service->getState();
         $_SESSION['oidc_state'] = $state;
         $_SESSION['oidc_login_url'] = GeneralUtility::getIndpEnv('REQUEST_URI');
         $_SESSION['oidc_authorization_url'] = $authorizationUrl;
-        unset($_SESSION['oidc_redirect_url']); // The redirect will be handled by this plugin
+
+        if ((isset($_SERVER['HTTP_REFERER']) && !empty($_SERVER['HTTP_REFERER'])) && strtolower(parse_url($_SERVER['HTTP_REFERER'], PHP_URL_HOST)) === strtolower($_SERVER['HTTP_HOST'])) {
+            $refererUrl = parse_url($_SERVER['HTTP_REFERER']);
+            $requestUrl = parse_url($_SERVER['REQUEST_URI']);
+
+            parse_str($refererUrl['query'], $refererParams);
+            parse_str($requestUrl['query'], $anbietenParams);
+
+            if ($anbietenParams['referer'] == 'anbieten') {
+                $_SESSION['oidc_redirect_url'] = '/anbieten';
+            } elseif (!array_key_exists('logout', $refererParams)) {
+                $_SESSION['oidc_redirect_url'] = $_SERVER['HTTP_REFERER'];
+            } else {
+                unset($_SESSION['oidc_redirect_url']);
+            }
+        }
 
         HttpUtility::redirect($authorizationUrl);
     }
 
-    protected function performRedirectAfterLogin()
+    protected
+    function performRedirectAfterLogin()
     {
         $redirectUrl = $this->determineRedirectUrl();
         HttpUtility::redirect($redirectUrl);
     }
 
-    protected function determineRedirectUrl()
+    protected
+    function determineRedirectUrl()
     {
-        if (! empty(GeneralUtility::_GP('redirect_url'))) {
+        if (!empty(GeneralUtility::_GP('redirect_url'))) {
             return GeneralUtility::_GP('redirect_url');
         }
 
         if (isset($this->pluginConfiguration['defaultRedirectPid'])) {
             $defaultRedirectPid = $this->pluginConfiguration['defaultRedirectPid'];
-            if ((int) $defaultRedirectPid > 0) {
+            if ((int)$defaultRedirectPid > 0) {
                 return $this->cObj->typoLink_URL(['parameter' => $defaultRedirectPid]);
             }
         }
@@ -123,18 +143,23 @@ class LoginController
         return '/';
     }
 
-    protected function generateCodeVerifier(): string
+    protected
+    function generateCodeVerifier(): string
     {
         return bin2hex(random_bytes(64));
     }
 
-    protected function convertVerifierToChallenge($codeVerifier)
-    {
+    protected
+    function convertVerifierToChallenge(
+        $codeVerifier
+    ) {
         return rtrim(strtr(base64_encode(hash('sha256', $codeVerifier, true)), '+/', '-_'), '=');
     }
 
-    protected function addCodeChallengeToOptions($codeChallenge, array $options = []): array
-    {
+    protected
+    function addCodeChallengeToOptions(
+        $codeChallenge, array $options = []
+    ): array {
         return array_merge(
             $options,
             [
