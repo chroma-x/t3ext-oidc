@@ -13,6 +13,14 @@
  */
 
 // see https://github.com/thephpleague/oauth2-client
+
+// Redirect to homepage when user decline AGB in Keycloak
+if (!empty($_GET['error'])) {
+    if ($_GET['error'] === 'access_denied') {
+        header('Location: ' . 'https://' . $_SERVER['SERVER_NAME']);
+    }
+}
+
 if (!(empty($_GET['state']) || empty($_GET['code']))) {
     $schema = (@$_SERVER['HTTPS'] === 'on') ? 'https://' : 'http://';
     $currentUrl = $schema . $_SERVER['SERVER_NAME'];
